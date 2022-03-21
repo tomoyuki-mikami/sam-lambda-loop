@@ -1,0 +1,80 @@
+{
+  "Comment": "LambdaLoop",
+  "StartAt": "MakeRecordFunction",
+  "States": {
+    "MakeRecordFunction": {
+      "Type": "Task",
+      "Resource": "${MakeRecordFunctionArn}",
+      "ResultPath": "$.make_record_result",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "errorString"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 0,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "FunctionEnd"
+        }
+      ],
+      "Next": "ConfigureLoop"
+    },
+    "ConfigureLoop": {
+      "Type": "Pass",
+      "Result": {
+        "continue": true,
+        "cnt": 0
+      },
+      "ResultPath": "$.result.iterator",
+      "Next": "ProcessLoopFunction"
+    },
+    "ProcessLoopFunction": {
+      "Type": "Task",
+      "Resource": "${ProcessLoopFunctionArn}",
+      "ResultPath": "$.result",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 0,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "ResultPath": "$.error",
+          "Next": "FunctionEnd"
+        }
+      ],
+      "Next": "IsContinue"
+    },
+    "IsContinue": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.result.iterator.continue",
+          "BooleanEquals": true,
+          "Next": "ProcessLoopFunction"
+        }
+      ],
+      "Default": "FunctionEnd"
+    },
+    "FunctionEnd": {
+      "Type": "Pass",
+      "End": true
+    }
+  }
+}

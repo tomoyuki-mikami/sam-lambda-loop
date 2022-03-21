@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-lambda-loop
+
+  Sample SAM Template for sam-lambda-loop
+  
+Globals:
+  Function:
+    Timeout: 60
+
+Resources:
+  ProcessStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine.json
+      DefinitionSubstitutions:
+        MakeRecordFunctionArn: !GetAtt MakeRecordFunction.Arn
+        ProcessLoopFunctionArn: !GetAtt ProcessLoopFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref MakeRecordFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ProcessLoopFunction
+
+  MakeRecordFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: makeRecord/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - x86_64
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0   # 最大再試行回数は 0 とする
+      Environment:
+        Variables:
+          TZ: Asia/Tokyo
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: Process
+
+  ProcessLoopFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: processLoop/
+      Handler: app.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - x86_64
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0   # 最大再試行回数は 0 とする
+      Environment:
+        Variables:
+          TZ: Asia/Tokyo
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: Process
+
+  ProcessDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: ymd
+          AttributeType: N
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ymd
+          KeyType: HASH
+        - AttributeName: id
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TableName: Process
